@@ -443,6 +443,7 @@
         let pontuacao = 0;
         let alertas = [];
         let aspectosPositivos = [];
+        let aspectosNegativos = [];
         
         // CRITÉRIOS POSITIVOS (+pontos)
         
@@ -454,13 +455,15 @@
         
         // 2. Domínios conhecidos e confiáveis (+30 pontos)
         const dominiosConfiaveis = [
-            'github.io',
-            'google.com',
-            'microsoft.com',
-            'amazon.com.br',
-            'mercadolivre.com.br',
-            'gov.br',
-            'edu.br'
+            'github.io', 'google.com', 'microsoft.com', 'apple.com',
+            'amazon.com.br', 'mercadolivre.com.br', 'magazineluiza.com.br',
+            'americanas.com.br', 'casasbahia.com.br', 'extra.com.br',
+            'gov.br', 'edu.br', 'wikipedia.org', 'youtube.com',
+            'facebook.com', 'instagram.com', 'twitter.com', 'linkedin.com',
+            'netflix.com', 'spotify.com', 'nubank.com.br', 'itau.com.br',
+            'bradesco.com.br', 'santander.com.br', 'caixa.gov.br',
+            'correios.com.br', 'uol.com.br', 'globo.com', 'terra.com.br',
+            'outlook.com', 'yahoo.com'
         ];
         if (dominiosConfiaveis.some(dominio => url.includes(dominio))) {
             pontuacao += 30;
@@ -476,20 +479,31 @@
         // 4. URL com tamanho razoável (+5 pontos)
         if (url.length < 100) {
             pontuacao += 5;
+            aspectosPositivos.push('URL com tamanho adequado');
         }
         
         // CRITÉRIOS NEGATIVOS (-pontos)
         
+        // 0. Domínio desconhecido (não está na lista de confiáveis) - informativo
+        const isDominioConhecido = dominiosConfiaveis.some(dominio => url.includes(dominio));
+        if (!isDominioConhecido && !url.includes('.gov.br') && !url.includes('.edu.br')) {
+            aspectosNegativos.push('Domínio não está na lista de sites conhecidos e confiáveis');
+        }
+        
         // 1. Palavras suspeitas (-20 pontos cada)
         const palavrasSuspeitas = [
             'gratis', 'free', 'premio', 'ganhe', 'sorteio',
-            'urgente', 'bloqueio', 'senha', 'dados',
-            'confirme', 'atualize', 'verificacao'
+            'urgente', 'bloqueio', 'senha', 'dados', 'confirme',
+            'atualize', 'verificacao', 'clique', 'click', 'winner',
+            'promocao', 'oferta', 'desconto', 'barato', 'bonus',
+            'dinheiro', 'money', 'cash', 'pix', 'transferencia',
+            'conta', 'cartao', 'credito', 'banco', 'cpf'
         ];
         palavrasSuspeitas.forEach(palavra => {
             if (url.toLowerCase().includes(palavra)) {
                 pontuacao -= 20;
                 alertas.push(`Palavra suspeita detectada: "${palavra}"`);
+                aspectosNegativos.push(`Contém palavra suspeita: "${palavra}"`);
             }
         });
         
@@ -498,6 +512,7 @@
         if (tldsSuspeitos.some(tld => url.includes(tld))) {
             pontuacao -= 30;
             alertas.push('Domínio de extensão suspeita');
+            aspectosNegativos.push('Extensão de domínio suspeita');
         }
         
         // 3. Números excessivos no domínio (-15 pontos)
@@ -506,6 +521,7 @@
         if (numerosNoDominio > 3) {
             pontuacao -= 15;
             alertas.push('Muitos números no domínio');
+            aspectosNegativos.push(`Domínio com muitos números (${numerosNoDominio})`);
         }
         
         // 4. Hífens excessivos (-10 pontos)
@@ -513,18 +529,23 @@
         if (hifens > 2) {
             pontuacao -= 10;
             alertas.push('Muitos hífens no domínio');
+            aspectosNegativos.push(`Domínio com muitos hífens (${hifens})`);
         }
         
         // 5. URL muito longa (-15 pontos)
         if (url.length > 150) {
             pontuacao -= 15;
             alertas.push('URL suspeita muito longa');
+            aspectosNegativos.push(`URL muito longa (${url.length} caracteres)`);
+        } else if (url.length > 80) {
+            aspectosNegativos.push(`URL um pouco longa (${url.length} caracteres) - prefira URLs mais curtas`);
         }
         
         // 6. Sem HTTPS (-25 pontos)
         if (!url.startsWith('https://')) {
             pontuacao -= 25;
             alertas.push('Conexão não segura (sem HTTPS)');
+            aspectosNegativos.push('Não usa HTTPS (conexão insegura)');
         }
         
         // 7. Subdomínios suspeitos (-20 pontos)
@@ -532,6 +553,7 @@
         if (subdominiosSuspeitos.some(sub => url.includes(sub + '.'))) {
             pontuacao -= 20;
             alertas.push('Subdomínio suspeito detectado');
+            aspectosNegativos.push('Subdomínio suspeito (login, secure, etc)');
         }
         
         // CLASSIFICAÇÃO FINAL
@@ -557,19 +579,21 @@
             mensagem = 'Site apresenta múltiplos sinais de perigo! Evite acessar.';
         }
         
-        // Dados técnicos simulados baseados no status
+        // Dados que podem ser obtidos apenas pela URL
         const ssl = url.startsWith('https://') ? 'Ativo' : 'Inativo';
-        const certificado = ssl === 'Ativo' ? 
-            (pontuacao >= 30 ? 'Let\'s Encrypt (Válido)' : 'Autoassinado (Suspeito)') : 
-            'Não possui';
-        const servidor = pontuacao >= 30 ? 'Apache/2.4.41' : 'Nginx/1.18.0';
-        const tecnologias = pontuacao >= 30 ? ['HTML5', 'CSS3', 'JavaScript'] : ['HTML', 'PHP'];
-        const reputacao = pontuacao >= 30 ? 'Boa' : pontuacao >= 0 ? 'Questionável' : 'Muito ruim';
+        
+        // Identificar tipo de domínio
+        let tipoDominio = 'Domínio comum';
+        if (url.includes('.gov.br')) tipoDominio = '🏛️ Governo (.gov.br)';
+        else if (url.includes('.edu.br')) tipoDominio = '🎓 Educacional (.edu.br)';
+        else if (url.includes('.com.br')) tipoDominio = '🇧🇷 Comercial brasileiro (.com.br)';
+        else if (url.includes('github.io')) tipoDominio = '💻 GitHub Pages';
+        else if (tldsSuspeitos.some(tld => url.includes(tld))) tipoDominio = '⚠️ Extensão suspeita';
         
         return {
             url, status, cor, icone, risco, mensagem,
-            ssl, certificado, servidor, tecnologias, reputacao,
-            pontuacao, alertas, aspectosPositivos
+            ssl, tipoDominio,
+            pontuacao, alertas, aspectosPositivos, aspectosNegativos
         };
     }
     
@@ -587,6 +611,10 @@
                             <p class="text-sm opacity-90">Nível de Risco: ${dados.risco}</p>
                         </div>
                     </div>
+                    <div class="text-right">
+                        <div class="text-3xl font-bold">${dados.pontuacao}</div>
+                        <div class="text-xs opacity-75">pontos</div>
+                    </div>
                 </div>
                 
                 <div class="bg-black bg-opacity-30 p-3 rounded-lg mb-6">
@@ -594,62 +622,44 @@
                     <div class="font-mono text-sm break-all">${dados.url}</div>
                 </div>
                 
-                <div class="grid md:grid-cols-2 gap-6 mb-6">
-                    <div class="space-y-4">
-                        <h4 class="text-lg font-bold border-b border-white border-opacity-30 pb-2">📊 Informações Gerais</h4>
-                        <div class="flex justify-between items-center">
-                            <span class="text-sm opacity-90">⭐ Reputação:</span>
-                            <span class="font-semibold">${dados.reputacao}</span>
+                <div class="mb-6">
+                    <h4 class="text-lg font-bold mb-3">🔍 O que conseguimos ver na URL:</h4>
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <div class="bg-black bg-opacity-30 p-3 rounded-lg">
+                            <div class="text-xs opacity-75 mb-1">Conexão</div>
+                            <div class="font-semibold ${dados.ssl === 'Ativo' ? 'text-green-300' : 'text-red-300'}">
+                                ${dados.ssl === 'Ativo' ? '🔒 HTTPS (Seguro)' : '⚠️ HTTP (Não seguro)'}
+                            </div>
                         </div>
-                        <div class="flex justify-between items-center">
-                            <span class="text-sm opacity-90">🖥️ Servidor:</span>
-                            <span class="font-semibold text-xs">${dados.servidor}</span>
-                        </div>
-                    </div>
-                    
-                    <div class="space-y-4">
-                        <h4 class="text-lg font-bold border-b border-white border-opacity-30 pb-2">🔒 Segurança</h4>
-                        <div class="flex justify-between items-center">
-                            <span class="text-sm opacity-90">🔐 SSL/HTTPS:</span>
-                            <span class="font-semibold ${dados.ssl === 'Ativo' ? 'text-green-300' : 'text-red-300'}">${dados.ssl}</span>
-                        </div>
-                        <div class="flex justify-between items-center">
-                            <span class="text-sm opacity-90">📜 Certificado:</span>
-                            <span class="font-semibold text-xs">${dados.certificado}</span>
+                        <div class="bg-black bg-opacity-30 p-3 rounded-lg">
+                            <div class="text-xs opacity-75 mb-1">Tipo de Domínio</div>
+                            <div class="font-semibold">${dados.tipoDominio}</div>
                         </div>
                     </div>
                 </div>
                 
-                <div class="border-t border-white border-opacity-30 pt-4">
-                    <h4 class="text-lg font-bold mb-3">🔍 Análise Detalhada</h4>
+                <div class="border-t border-white border-opacity-30 pt-4 mb-4">
+                    <h4 class="text-lg font-bold mb-3">📊 Análise de Segurança</h4>
                     <p class="mb-4">${dados.mensagem}</p>
                 </div>
                 
-                <div class="border-t border-white border-opacity-30 pt-4 mt-4">
-                    <h4 class="text-lg font-bold mb-3">📊 Análise de Critérios</h4>
-                    <div class="mb-3">
-                        <span class="text-sm opacity-75">Pontuação Total:</span>
-                        <span class="font-bold text-xl ml-2">${dados.pontuacao} pontos</span>
+                ${dados.aspectosPositivos.length > 0 ? `
+                    <div class="bg-green-900 bg-opacity-50 p-4 rounded-lg mb-4">
+                        <h5 class="font-semibold text-green-300 mb-2">✓ Aspectos Positivos:</h5>
+                        <ul class="text-sm space-y-1 list-disc list-inside">
+                            ${dados.aspectosPositivos.map(asp => `<li>${asp}</li>`).join('')}
+                        </ul>
                     </div>
-                    
-                    ${dados.aspectosPositivos.length > 0 ? `
-                        <div class="mb-3">
-                            <h5 class="font-semibold text-green-300 mb-2">✓ Aspectos Positivos:</h5>
-                            <ul class="text-sm space-y-1">
-                                ${dados.aspectosPositivos.map(asp => `<li>${asp}</li>`).join('')}
-                            </ul>
-                        </div>
-                    ` : ''}
-                    
-                    ${dados.alertas.length > 0 ? `
-                        <div>
-                            <h5 class="font-semibold text-red-300 mb-2">⚠ Alertas Identificados:</h5>
-                            <ul class="text-sm space-y-1">
-                                ${dados.alertas.map(alerta => `<li>${alerta}</li>`).join('')}
-                            </ul>
-                        </div>
-                    ` : ''}
-                </div>
+                ` : ''}
+                
+                ${dados.aspectosNegativos.length > 0 ? `
+                    <div class="bg-red-900 bg-opacity-50 p-4 rounded-lg">
+                        <h5 class="font-semibold text-red-300 mb-2">✗ Aspectos Negativos:</h5>
+                        <ul class="text-sm space-y-1 list-disc list-inside">
+                            ${dados.aspectosNegativos.map(asp => `<li>${asp}</li>`).join('')}
+                        </ul>
+                    </div>
+                ` : ''}
             </div>
         `;
     }
