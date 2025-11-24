@@ -440,48 +440,136 @@
     };
     
     function gerarDadosAnalise(url) {
-        let status, cor, icone, mensagem, risco;
-        let ssl, certificado, servidor, tecnologias, reputacao;
+        let pontuacao = 0;
+        let alertas = [];
+        let aspectosPositivos = [];
         
-        // Determinar status baseado na URL
-        if (url.includes('https://') && !url.includes('suspeito') && !url.includes('golpe') && !url.includes('promo')) {
+        // CRITÉRIOS POSITIVOS (+pontos)
+        
+        // 1. HTTPS presente (+15 pontos)
+        if (url.startsWith('https://')) {
+            pontuacao += 15;
+            aspectosPositivos.push('Conexão segura HTTPS');
+        }
+        
+        // 2. Domínios conhecidos e confiáveis (+30 pontos)
+        const dominiosConfiaveis = [
+            'github.io',
+            'google.com',
+            'microsoft.com',
+            'amazon.com.br',
+            'mercadolivre.com.br',
+            'gov.br',
+            'edu.br'
+        ];
+        if (dominiosConfiaveis.some(dominio => url.includes(dominio))) {
+            pontuacao += 30;
+            aspectosPositivos.push('Domínio de plataforma confiável');
+        }
+        
+        // 3. Domínio brasileiro (.br, .com.br) (+10 pontos)
+        if (url.match(/\.(com\.br|gov\.br|edu\.br|org\.br)/) || url.includes('.br/')) {
+            pontuacao += 10;
+            aspectosPositivos.push('Domínio brasileiro registrado');
+        }
+        
+        // 4. URL com tamanho razoável (+5 pontos)
+        if (url.length < 100) {
+            pontuacao += 5;
+        }
+        
+        // CRITÉRIOS NEGATIVOS (-pontos)
+        
+        // 1. Palavras suspeitas (-20 pontos cada)
+        const palavrasSuspeitas = [
+            'gratis', 'free', 'premio', 'ganhe', 'sorteio',
+            'urgente', 'bloqueio', 'senha', 'dados',
+            'confirme', 'atualize', 'verificacao'
+        ];
+        palavrasSuspeitas.forEach(palavra => {
+            if (url.toLowerCase().includes(palavra)) {
+                pontuacao -= 20;
+                alertas.push(`Palavra suspeita detectada: "${palavra}"`);
+            }
+        });
+        
+        // 2. Domínios suspeitos (-30 pontos)
+        const tldsSuspeitos = ['.tk', '.ml', '.ga', '.cf', '.gq', '.xyz'];
+        if (tldsSuspeitos.some(tld => url.includes(tld))) {
+            pontuacao -= 30;
+            alertas.push('Domínio de extensão suspeita');
+        }
+        
+        // 3. Números excessivos no domínio (-15 pontos)
+        const parteDominio = url.split('/')[2] || url;
+        const numerosNoDominio = (parteDominio.match(/\d/g) || []).length;
+        if (numerosNoDominio > 3) {
+            pontuacao -= 15;
+            alertas.push('Muitos números no domínio');
+        }
+        
+        // 4. Hífens excessivos (-10 pontos)
+        const hifens = (parteDominio.match(/-/g) || []).length;
+        if (hifens > 2) {
+            pontuacao -= 10;
+            alertas.push('Muitos hífens no domínio');
+        }
+        
+        // 5. URL muito longa (-15 pontos)
+        if (url.length > 150) {
+            pontuacao -= 15;
+            alertas.push('URL suspeita muito longa');
+        }
+        
+        // 6. Sem HTTPS (-25 pontos)
+        if (!url.startsWith('https://')) {
+            pontuacao -= 25;
+            alertas.push('Conexão não segura (sem HTTPS)');
+        }
+        
+        // 7. Subdomínios suspeitos (-20 pontos)
+        const subdominiosSuspeitos = ['login', 'secure', 'account', 'verify', 'update'];
+        if (subdominiosSuspeitos.some(sub => url.includes(sub + '.'))) {
+            pontuacao -= 20;
+            alertas.push('Subdomínio suspeito detectado');
+        }
+        
+        // CLASSIFICAÇÃO FINAL
+        let status, cor, icone, risco, mensagem;
+        
+        if (pontuacao >= 30) {
             status = 'Seguro';
             cor = 'green';
             icone = '✅';
             risco = 'Baixo';
             mensagem = 'Este site apresenta boas práticas de segurança.';
-            ssl = 'Ativo';
-            certificado = 'Let\'s Encrypt (Válido)';
-            servidor = 'Apache/2.4.41';
-            tecnologias = ['HTML5', 'CSS3', 'JavaScript'];
-            reputacao = 'Boa';
-        } else if (url.includes('suspeito') || url.includes('promo') || url.includes('gratis')) {
+        } else if (pontuacao >= 0) {
             status = 'Suspeito';
             cor = 'yellow';
             icone = '⚠️';
             risco = 'Médio';
-            mensagem = 'Site apresenta características suspeitas.';
-            ssl = url.includes('https://') ? 'Ativo' : 'Inativo';
-            certificado = ssl === 'Ativo' ? 'Autoassinado (Suspeito)' : 'Não possui';
-            servidor = 'Nginx/1.18.0';
-            tecnologias = ['HTML', 'PHP'];
-            reputacao = 'Questionável';
+            mensagem = 'Site apresenta algumas características suspeitas. Tenha cuidado.';
         } else {
             status = 'Perigoso';
             cor = 'red';
             icone = '🚨';
             risco = 'Alto';
-            mensagem = 'Site apresenta múltiplos sinais de perigo!';
-            ssl = 'Inativo';
-            certificado = 'Não possui';
-            servidor = 'Desconhecido';
-            tecnologias = ['HTML básico'];
-            reputacao = 'Muito ruim';
+            mensagem = 'Site apresenta múltiplos sinais de perigo! Evite acessar.';
         }
+        
+        // Dados técnicos simulados baseados no status
+        const ssl = url.startsWith('https://') ? 'Ativo' : 'Inativo';
+        const certificado = ssl === 'Ativo' ? 
+            (pontuacao >= 30 ? 'Let\'s Encrypt (Válido)' : 'Autoassinado (Suspeito)') : 
+            'Não possui';
+        const servidor = pontuacao >= 30 ? 'Apache/2.4.41' : 'Nginx/1.18.0';
+        const tecnologias = pontuacao >= 30 ? ['HTML5', 'CSS3', 'JavaScript'] : ['HTML', 'PHP'];
+        const reputacao = pontuacao >= 30 ? 'Boa' : pontuacao >= 0 ? 'Questionável' : 'Muito ruim';
         
         return {
             url, status, cor, icone, risco, mensagem,
-            ssl, certificado, servidor, tecnologias, reputacao
+            ssl, certificado, servidor, tecnologias, reputacao,
+            pontuacao, alertas, aspectosPositivos
         };
     }
     
@@ -535,6 +623,32 @@
                 <div class="border-t border-white border-opacity-30 pt-4">
                     <h4 class="text-lg font-bold mb-3">🔍 Análise Detalhada</h4>
                     <p class="mb-4">${dados.mensagem}</p>
+                </div>
+                
+                <div class="border-t border-white border-opacity-30 pt-4 mt-4">
+                    <h4 class="text-lg font-bold mb-3">📊 Análise de Critérios</h4>
+                    <div class="mb-3">
+                        <span class="text-sm opacity-75">Pontuação Total:</span>
+                        <span class="font-bold text-xl ml-2">${dados.pontuacao} pontos</span>
+                    </div>
+                    
+                    ${dados.aspectosPositivos.length > 0 ? `
+                        <div class="mb-3">
+                            <h5 class="font-semibold text-green-300 mb-2">✓ Aspectos Positivos:</h5>
+                            <ul class="text-sm space-y-1">
+                                ${dados.aspectosPositivos.map(asp => `<li>${asp}</li>`).join('')}
+                            </ul>
+                        </div>
+                    ` : ''}
+                    
+                    ${dados.alertas.length > 0 ? `
+                        <div>
+                            <h5 class="font-semibold text-red-300 mb-2">⚠ Alertas Identificados:</h5>
+                            <ul class="text-sm space-y-1">
+                                ${dados.alertas.map(alerta => `<li>${alerta}</li>`).join('')}
+                            </ul>
+                        </div>
+                    ` : ''}
                 </div>
             </div>
         `;
